@@ -1,146 +1,178 @@
-# Smart Query Assistant: Text2SQL Agent with Long-Term Memory
+# 智能查询助手：具有长期记忆的Text2SQL代理
 
-A text-to-SQL agent that remembers user preferences across sessions, implementing user-specific, long-term memory for smarter database interactions.
+一个能够记住用户偏好的文本转SQL代理，实现用户特定的长期记忆，为更智能的数据库交互提供支持。
 
-![Smart Query Assistant](https://img.shields.io/badge/Smart_Query_Assistant-v1.0-blue)
+![智能查询助手](https://img.shields.io/badge/Smart_Query_Assistant-v1.0-blue)
 ![Python 3.8+](https://img.shields.io/badge/Python-3.8+-green.svg)
 ![License MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-## 📋 Overview
+## 📋 概述
 
-The Smart Query Assistant transforms the traditional text-to-SQL experience by implementing long-term memory capabilities that persist across user sessions. Inspired by the Mem0 architecture, this implementation focuses specifically on database query interactions and maintains complete user isolation for personalized, secure experiences.
+智能查询助手通过实现跨用户会话的长期记忆功能，改变了传统的文本转SQL体验。受Mem0架构启发，此实现专门专注于数据库查询交互，并保持完整的用户隔离，提供个性化、安全的体验。
 
-### Why long-term memory matters for database queries
+### 为什么长期记忆对数据库查询很重要
 
-In traditional text2SQL systems, conversations restart from scratch each session. Preferences, terminology, and context vanish, forcing users to repeatedly re-educate their AI assistant. This creates significant cognitive load as users must:
+在传统的text2SQL系统中，每次会话对话都从头开始。偏好、术语和上下文消失，迫使用户重复教育他们的AI助手。这造成了显著的认知负担，因为用户必须：
 
-- Respecify preferences ("only show approved loans") every morning
-- Redefine terminology ("luxury properties") each session
-- Constantly refresh context for follow-up questions
+- 每天早上重新指定偏好（"只显示已批准的贷款"）
+- 每个会话重新定义术语（"豪华房产"）
+- 不断刷新后续问题的上下文
 
-This implementation solves these problems by enabling your text2SQL agent to remember:
+此实现通过使您的text2SQL代理能够记住以下内容来解决这些问题：
 
-- User preferences across sessions (automatically filtering by criteria)
-- Domain-specific terminology that bridges user language and database schema
-- Context over time (allowing natural follow-ups like "How many of those were from California?" days later)
-- Data interests, improving relevance without explicit instruction
+- 跨会话的用户偏好（自动按标准过滤）
+- 连接用户语言和数据库模式的领域特定术语
+- 随时间推移的上下文（允许自然的后续问题，如几天后问"其中有多少来自加利福尼亚？"）
+- 数据兴趣，无需明确指示即可提高相关性
 
-## ✨ Key Features
+## ✨ 主要功能
 
-- **Multi-user memory isolation**: Each user's preferences stored separately, preventing cross-contamination
-- **User-targeted extraction**: Identifies SQL-relevant elements (entities, preferences, terminology, metrics) per user
-- **Database schema integration**: Connects memories directly to database schema for accurate SQL generation
-- **Vector-based similarity search**: Efficiently retrieves relevant memories using embedding similarity
-- **Interactive memory management**: View and understand what the system remembers about your preferences
-- **Gradio web interface**: User-friendly frontend for interacting with the system
+- **多用户记忆隔离**：每个用户的偏好单独存储，防止交叉污染
+- **用户目标提取**：识别每个用户的SQL相关元素（实体、偏好、术语、指标）
+- **数据库模式集成**：将记忆直接连接到数据库模式以生成准确的SQL
+- **基于向量的相似性搜索**：使用嵌入相似性高效检索相关记忆
+- **交互式记忆管理**：查看和理解系统记住的关于您偏好的内容
+- **Gradio网络界面**：用于与系统交互的用户友好前端
 
-## 🛠️ Architecture
+## 🛠️ 架构
 
-The system consists of two primary phases that work together:
+系统由两个协同工作的主要阶段组成：
 
-1. **Extraction Phase**:
-   - Message Ingestion: Processes new message pairs (user question + AI response)
-   - Context Retrieval: Leverages conversation summary and recent messages
-   - LLM Processing: Analyzes the conversation to extract relevant information
+1. **提取阶段**：
+   - 消息摄取：处理新的消息对（用户问题 + AI响应）
+   - 上下文检索：利用对话摘要和最近消息
+   - LLM处理：分析对话以提取相关信息
 
-2. **User-Specific Memory Extraction**:
-   - Entity Extraction: Identifies database entities the user frequently references
-   - Preference Capture: Records filtering and sorting preferences
-   - Terminology Recognition: Maps user-defined terms to database equivalents
-   - Metric Definition: Stores custom calculations or criteria
+2. **用户特定记忆提取**：
+   - 实体提取：识别用户经常引用的数据库实体
+   - 偏好捕获：记录过滤和排序偏好
+   - 术语识别：将用户定义的术语映射到数据库等效项
+   - 指标定义：存储自定义计算或标准
 
-3. **Memory Update Phase**:
-   - Similarity Search: Finds similar existing memories
-   - Operation Classification: Determines whether to ADD, UPDATE, DELETE, or make NO CHANGE
-   - Vector Database Storage: Stores memories with proper user isolation
+3. **记忆更新阶段**：
+   - 相似性搜索：找到相似的现有记忆
+   - 操作分类：确定是添加、更新、删除还是不更改
+   - 向量数据库存储：以适当的用户隔离存储记忆
 
-## 🔧 Installation
+## 🔧 安装
 
-### Prerequisites
+### 先决条件
 
 - Python 3.8+
-- PostgreSQL with pgvector extension (for production) or JSON storage (for development)
-- Denodo data virtualization platform
-- OpenAI API key
+- 带有pgvector扩展的PostgreSQL（用于生产）或JSON存储（用于开发）
+- 火山引擎AI API密钥
 
-### Setup
+### 设置
 
-1. Clone the repository:
+1. 克隆仓库：
    ```bash
-   git clone https://github.com/yourusername/smart-query-assistant.git
-   cd smart-query-assistant
+   git clone https://github.com/yourusername/Text2SQl-Agent-with-Long-Term-Memory.git
+   cd Text2SQl-Agent-with-Long-Term-Memory
    ```
 
-2. Install dependencies:
+2. 安装依赖：
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Set up environment variables (create a `.env` file):
+3. 设置环境变量（创建`.env`文件）：
+   ```bash
+   # 复制配置示例文件
+   cp env_example.txt .env
+   
+   # 编辑.env文件，填入您的实际配置
    ```
-   DENODO_API_HOST=http://yourdenodoaisdkhost:8080
-   DENODO_USERNAME=yourusername
-   DENODO_PASSWORD=yourpassword
-   OPENAI_API_KEY=your_openai_api_key
-   EMBEDDING_MODEL=text-embedding-ada-002
-   LLM_MODEL=gpt-4o-mini
-   PG_CONN_STRING=postgresql://user:password@localhost:5432/memorydb
-   ```
+   
+   **重要安全提示**：
+   - `.env`文件包含敏感信息，已被添加到`.gitignore`中
+   - 请确保不要将`.env`文件提交到版本控制系统
+   - 生产环境中请使用强密码和安全的API密钥
 
-4. Initialize PostgreSQL with pgvector (optional, for production):
+4. 使用pgvector初始化PostgreSQL（可选，用于生产）：
    ```sql
    CREATE EXTENSION IF NOT EXISTS vector;
    ```
 
-## 🚀 Usage
+## 🚀 使用方法
 
-### Starting the Web Interface
+### 1. 配置火山引擎AI
+
+首先，您需要获取火山引擎AI的API密钥：
+
+1. 访问火山引擎控制台
+2. 创建或选择您的项目
+3. 在AI服务中获取API密钥
+4. 将API密钥配置到.env文件中
+
+### 2. 测试配置
+
+运行配置测试脚本：
 
 ```bash
+python test_volcengine_config.py
+```
+
+这将验证您的火山引擎AI配置是否正确。
+
+### 3. 启动网络界面
+
+```bash
+# 使用启动脚本（推荐）
+python start.py
+
+# 或直接启动
 python memory_frontend.py
 ```
 
-This will launch a Gradio web interface accessible at http://localhost:7860.
+这将启动一个Gradio网络界面，可通过http://localhost:7860访问。
 
-## Remember you can replace DenodoAPIClient with any of your data platform or database where you extract the semanic model
+### 4. 安全检查
 
-### Workflow
+运行安全检查确保配置安全：
 
-1. **Login**: Enter your Denodo credentials
-2. **Load Database**: Specify the database name to connect to
-3. **Ask Questions**: Start interacting with your database in natural language
-4. **View Memories**: See what the system has learned about your preferences
-
-### Example Interactions
-
-**Setting Preferences**:
-```
-User: I'm only interested in approved loans going forward.
-AI: I understand you want to focus on approved loans. I'll remember this preference.
-
-User: Show me the loans with the highest interest rates.
-AI: Here are the approved loans with the highest interest rates.
-(Note: I've applied your previously expressed preferences to this query.)
+```bash
+python start.py --security
+# 或
+python security_check.py
 ```
 
-**Learning Terminology**:
+### 工作流程
+
+1. **登录**：输入您的用户名
+2. **加载数据库**：指定要连接的数据库名称
+3. **提问**：开始用自然语言与数据库交互
+4. **查看记忆**：了解系统对您偏好的学习情况
+
+### 交互示例
+
+**设置偏好**：
 ```
-User: Let's define high-risk loans as those with credit scores below 750.
-AI: I've saved your definition of high-risk loans (credit scores below 750).
+用户：我只对已批准的贷款感兴趣。
+AI：我理解您想专注于已批准的贷款。我会记住这个偏好。
 
-User: How many high-risk loans do we have in California?
-AI: There are 28 high-risk loans in California.
-(Note: I've applied your definition of high-risk loans as those with credit scores below 750.)
+用户：显示利率最高的贷款。
+AI：以下是利率最高的已批准贷款。
+（注意：我已将您之前表达的偏好应用到此查询中。）
 ```
 
-## 📁 Project Structure
+**学习术语**：
+```
+用户：让我们将高风险贷款定义为信用评分低于750的贷款。
+AI：我已保存您对高风险贷款的定义（信用评分低于750）。
 
-- `memory_agent.py`: Backend implementation of the memory system
-- `memory_frontend.py`: Gradio-based web interface
-- `requirements.txt`: Required Python packages
-- `docs/`: Additional documentation and architecture diagrams
+用户：我们在加利福尼亚有多少高风险贷款？
+AI：加利福尼亚有28个高风险贷款。
+（注意：我已应用您对高风险贷款的定义，即信用评分低于750的贷款。）
+```
 
-## 📋 Requirements
+## 📁 项目结构
+
+- `memory_agent.py`：记忆系统的后端实现
+- `memory_frontend.py`：基于Gradio的网络界面
+- `requirements.txt`：所需的Python包
+- `docs/`：附加文档和架构图
+
+## 📋 要求
 
 ```
 gradio>=4.0.0
@@ -151,42 +183,42 @@ python-dotenv>=0.21.0
 requests>=2.28.1
 ```
 
-## 🔄 Memory Architecture
+## 🔄 记忆架构
 
-The memory system uses:
+记忆系统使用：
 
-- **PostgreSQL + pgvector**: Production storage with vector similarity search
-- **JSON files**: Development/fallback storage option
-- **Hierarchical indexing**: HNSW (Hierarchical Navigable Small World) index for efficient similarity searches
-- **User isolation**: Complete separation of memories between users
+- **PostgreSQL + pgvector**：具有向量相似性搜索的生产存储
+- **JSON文件**：开发/备用存储选项
+- **分层索引**：HNSW（分层可导航小世界）索引用于高效相似性搜索
+- **用户隔离**：用户之间记忆的完全分离
 
-## ⚙️ Configuration Options
+## ⚙️ 配置选项
 
-| Environment Variable | Description | Default |
+| 环境变量 | 描述 | 默认值 |
 |----------------------|-------------|---------|
-| DENODO_API_HOST | URL of your Denodo AI SDK API HOST | http://localhost:8080 |
-| OPENAI_API_KEY | Your OpenAI API key | None |
-| EMBEDDING_MODEL | Embedding model to use | text-embedding-ada-002 |
-| LLM_MODEL | Language model to use | gpt-4o-mini |
-| PG_CONN_STRING | PostgreSQL connection string | None |
+| AI_API_KEY | 您的火山引擎AI API密钥 | None |
+| AI_BASE_URL | 火山引擎AI服务基础URL | https://api.volcengine.com/v1 |
+| AI_MODEL | 要使用的AI模型 | doubao-seed-1-6-250615 |
+| THINKING | 思维链模式 | true |
+| EMBEDDING_MODEL | 要使用的嵌入模型 | Qwen/Qwen3-Embedding-8B |
+| PG_CONN_STRING | PostgreSQL连接字符串 | None |
 
-## 🌟 Use Cases
+## 🌟 使用案例
 
-- **Financial Analysis**: Remember analyst preferences for filtering financial data
-- **Property Management**: Store custom definitions of property categories
-- **Customer Support**: Maintain context about specific customer issues across sessions
-- **Data Exploration**: Build user-specific mental models of how database entities relate
+- **财务分析**：记住分析师过滤财务数据的偏好
+- **物业管理**：存储房产类别的自定义定义
+- **客户支持**：在会话中维护特定客户问题的上下文
+- **数据探索**：构建用户特定的数据库实体关系心理模型
 
-## 📄 License
+## 📄 许可证
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+本项目采用MIT许可证 - 详情请参阅LICENSE文件。
 
-## 🙏 Acknowledgments
+## 🙏 致谢
 
-- Inspired by the Mem0 architecture from mem0.ai
-- Built on top of the Denodo data virtualization platform
-- Uses OpenAI models for embeddings and text processing
+- 受mem0.ai的Mem0架构启发
+- 使用火山引擎AI模型进行嵌入和文本处理
 
-## 📬 Contact
+## 📬 联系
 
-For questions or support, please open an issue on GitHub.
+如有问题或需要支持，请在GitHub上提出issue。

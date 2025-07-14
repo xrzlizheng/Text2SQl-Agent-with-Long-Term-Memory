@@ -1,0 +1,103 @@
+# 数据库配置示例
+# ================
+# 替代Denodo的数据库配置选项
+
+# 1. PostgreSQL配置
+# -----------------
+DB_TYPE=postgresql
+PG_CONN_STRING=postgresql://username:password@localhost:5432/database_name
+
+# 或者分别配置：
+# DB_TYPE=postgresql
+# PG_HOST=localhost
+# PG_PORT=5432
+# PG_DATABASE=database_name
+# PG_USERNAME=username
+# PG_PASSWORD=password
+
+# 2. MySQL配置
+# ------------
+DB_TYPE=mysql
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_DATABASE=database_name
+MYSQL_USERNAME=username
+MYSQL_PASSWORD=password
+
+# 3. SQLite配置（推荐用于开发测试）
+# ---------------------------------
+DB_TYPE=sqlite
+SQLITE_PATH=database.db
+
+# 4. Oracle配置
+# -------------
+DB_TYPE=oracle
+ORACLE_HOST=localhost
+ORACLE_PORT=1521
+ORACLE_SERVICE=orcl
+ORACLE_USERNAME=username
+ORACLE_PASSWORD=password
+
+# 5. SQL Server配置
+# -----------------
+DB_TYPE=sqlserver
+SQLSERVER_HOST=localhost
+SQLSERVER_PORT=1433
+SQLSERVER_DATABASE=database_name
+SQLSERVER_USERNAME=username
+SQLSERVER_PASSWORD=password
+
+# 记忆存储配置
+# ============
+# 使用PostgreSQL存储记忆（生产环境推荐）
+USE_POSTGRES_MEMORY=true
+PG_CONN_STRING=postgresql://username:password@localhost:5432/memorydb
+
+# 使用JSON文件存储记忆（开发环境）
+USE_POSTGRES_MEMORY=false
+
+# OpenAI配置
+# ==========
+OPENAI_API_KEY=your_openai_api_key_here
+EMBEDDING_MODEL=text-embedding-ada-002
+LLM_MODEL=gpt-4o-mini
+
+# 快速开始示例
+# ============
+# 1. 使用SQLite（最简单）
+# 创建 .env 文件：
+DB_TYPE=sqlite
+SQLITE_PATH=test.db
+OPENAI_API_KEY=your_key_here
+
+# 2. 使用PostgreSQL
+# 创建 .env 文件：
+DB_TYPE=postgresql
+PG_CONN_STRING=postgresql://user:pass@localhost:5432/mydb
+OPENAI_API_KEY=your_key_here
+USE_POSTGRES_MEMORY=true
+
+# 3. 使用MySQL
+# 创建 .env 文件：
+DB_TYPE=mysql
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_DATABASE=mydb
+MYSQL_USERNAME=root
+MYSQL_PASSWORD=password
+OPENAI_API_KEY=your_key_here
+
+# 依赖安装
+# ========
+# PostgreSQL: pip install psycopg2-binary
+# MySQL: pip install pymysql
+# Oracle: pip install cx_Oracle
+# SQL Server: pip install pyodbc
+
+# 注意事项
+# ========
+# 1. 确保数据库服务正在运行
+# 2. 检查网络连接和防火墙设置
+# 3. 验证用户权限和数据库访问
+# 4. 生产环境建议使用PostgreSQL
+# 5. 开发测试推荐使用SQLite 

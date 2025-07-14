@@ -1,142 +1,222 @@
+"""
+智能查询助手前端界面（无Denodo版本）
+==================================
+
+这个模块提供了基于Gradio的用户界面，用于与具有长期记忆功能的Text2SQL代理进行交互，支持多种数据库类型。
+
+主要功能包括：
+- 数据库连接配置
+- 自然语言查询界面
+- 记忆管理和查看
+- 实时对话历史
+
+作者：xrzlizheng
+版本：1.0
+"""
+
 import os
 import json
-import requests
 import asyncio
 import gradio as gr
 from dotenv import load_dotenv
-from memory_agent import Mem0DenodoChatbot, Memory
+from memory_agent import SmartQueryAssistant
 
-# Load environment variables
+# 加载环境变量
 load_dotenv()
 
-# Global variables
-chatbot = None
-chat_history = []
-memories_history = []
-database_loaded = False
-current_user = None
+# 全局变量
+assistant = None  # 智能助手实例
+chat_history = []  # 聊天历史记录
+memories_history = []  # 记忆历史记录
+database_loaded = False  # 数据库加载状态
+current_user = None  # 当前用户
 
-# Configuration
-DENODO_API_HOST = os.getenv("DENODO_API_HOST", "http://localhost:8080")
+# 配置常量
+DB_TYPE = os.getenv("DB_TYPE", "sqlite")  # 数据库类型
+AI_API_KEY = os.getenv("AI_API_KEY", "")  # 火山引擎AI API密钥
+AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.volcengine.com/v1")  # 火山引擎AI服务基础URL
+AI_MODEL = os.getenv("AI_MODEL", "doubao-seed-1-6-250615")  # 火山引擎AI模型
+THINKING = os.getenv("THINKING", "true").lower() == "true"  # 思维链模式
+DB_CONFIG = {
+    "postgresql": {
+        "connection_string": os.getenv("PG_CONN_STRING", "")
+    },
+    "mysql": {
+        "host": os.getenv("MYSQL_HOST", "localhost"),
+        "port": int(os.getenv("MYSQL_PORT", "3306")),
+        "database": os.getenv("MYSQL_DATABASE", ""),
+        "username": os.getenv("MYSQL_USERNAME", ""),
+        "password": os.getenv("MYSQL_PASSWORD", "")
+    },
+    "sqlite": {
+        "database_path": os.getenv("SQLITE_PATH", "database.db")
+    }
+}
 
-# Initialize PostgreSQL configuration if available
+# PostgreSQL记忆存储配置
 PG_CONN_STRING = os.getenv("PG_CONN_STRING", "")
 USE_POSTGRES = bool(PG_CONN_STRING)
 
-def dummy_login(api_host, username, password):
-    """Test login with Denodo API"""
-    params = {
-        'vdp_database_names': 'fake_vdb',
-        'vdp_tag_names': 'fake_tag'
-    }
+def test_database_connection(db_type, **kwargs):
+    """
+    测试数据库连接
+    
+    Args:
+        db_type: 数据库类型
+        **kwargs: 数据库连接参数
+        
+    Returns:
+        连接测试结果
+    """
     try:
-        response = requests.get(f'{api_host}/getMetadata', params=params, auth=(username, password), verify=False)
-        # Accept any successful status code (2xx range)
-        return 200 <= response.status_code < 300
+        from database_client import DatabaseClientFactory
+        
+        # 创建数据库客户端
+        client = DatabaseClientFactory.create_client(db_type, **kwargs)
+        
+        # 测试连接
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            result = loop.run_until_complete(client.test_connection())
+            loop.close()
+            
+            if result:
+                return "✅ 数据库连接成功！"
+            else:
+                return "❌ 数据库连接失败，请检查配置。"
+        except Exception as e:
+            loop.close()
+            return f"❌ 连接测试失败: {e}"
+            
+    except ImportError as e:
+        return f"❌ 缺少数据库驱动: {e}"
     except Exception as e:
-        print(f"Login error: {e}")
-        return False
+        return f"❌ 连接测试失败: {e}"
 
-def login(username, password):
-    """Login and initialize chatbot with user credentials"""
-    global chatbot, current_user
+def login(username, password=None):
+    """
+    登录并初始化智能助手
     
-    # Validate credentials with Denodo API
-    login_success = dummy_login(DENODO_API_HOST, username, password)
+    Args:
+        username: 用户名
+        password: 密码（可选）
+        
+    Returns:
+        登录状态消息
+    """
+    global assistant, current_user
     
-    if login_success:
-        # Create the chatbot and set the current user
-        chatbot = Mem0DenodoChatbot(
-            use_postgres=USE_POSTGRES,
+    if not username:
+        return "请输入用户名。"
+    
+    try:
+        # 创建智能助手实例
+        assistant = SmartQueryAssistant(
+            db_type=DB_TYPE,
+            db_config=DB_CONFIG[DB_TYPE],
+            use_postgres_memory=USE_POSTGRES,
             postgres_conn_string=PG_CONN_STRING
         )
-        chatbot.set_user(username, password)
+        
+        # 设置用户
+        assistant.set_user(username, password)
         current_user = username
         
-        return f"✅ Login successful. Welcome, {username}!"
-    else:
-        return "❌ Login failed. Please check your credentials."
+        return f"✅ 登录成功。欢迎，{username}！"
+    except Exception as e:
+        return f"❌ 登录失败: {e}"
 
-async def initialize_chatbot(database_name):
-    """Initialize the chatbot with the specified database"""
-    global chatbot, database_loaded
+async def initialize_assistant():
+    """
+    初始化智能助手
     
-    if not chatbot or not current_user:
-        return "Please log in first."
+    Returns:
+        初始化状态消息
+    """
+    global assistant, database_loaded
     
-    # Initialize database metadata
-    success = await chatbot.initialize_db()
+    if not assistant or not current_user:
+        return "请先登录。"
+    
+    # 初始化数据库
+    success = await assistant.initialize_db()
     database_loaded = success
     
     if success:
-        return f"✅ Database '{database_name}' successfully loaded for user {current_user}. You can now ask questions about the data."
+        return f"✅ 数据库 '{DB_TYPE}' 已成功为用户 {current_user} 加载。您现在可以询问数据。"
     else:
-        return f"❌ Failed to load database '{database_name}'. Please check your connection settings."
+        return f"❌ 加载数据库 '{DB_TYPE}' 失败。请检查您的连接设置。"
 
-def load_database(database_name):
-    """Load the specified database and return status message"""
-    if not current_user:
-        return "Please log in first."
-        
-    if not database_name:
-        return "Please enter a database name."
+def load_database():
+    """
+    加载数据库并返回状态消息
     
-    result = asyncio.run(initialize_chatbot(database_name))
+    Returns:
+        加载状态消息
+    """
+    if not current_user:
+        return "请先登录。"
+    
+    result = asyncio.run(initialize_assistant())
     return result
 
 async def process_message_async(message):
-    """Process a message asynchronously"""
-    global chatbot, chat_history, database_loaded, memories_history
+    """
+    异步处理消息
+    
+    Args:
+        message: 用户消息
+        
+    Returns:
+        处理后的响应
+    """
+    global assistant, database_loaded, memories_history
     
     if not current_user:
-        return "Please log in first."
+        return "请先登录。"
         
     if not database_loaded:
-        return "Please load a database first using the 'Load Database' button."
+        return "请先使用'加载数据库'按钮加载数据库。"
     
-    # Process the message and get the response
-    response = await chatbot.process_message(message)
+    # 处理消息并获取响应
+    response = await assistant.process_message(message)
     
-    # Clean up the response by removing disclaimers and table information
-    response_lines = response.split('\n')
-    cleaned_lines = []
-    
-    for line in response_lines:
-        # Skip disclaimer and table information lines
-        if not any(skip in line for skip in [
-            "DISCLAIMER:",
-            "This information was retrieved from:",
-            "has been generated based on"
-        ]):
-            cleaned_lines.append(line)
-    
-    # Rejoin the cleaned lines
-    cleaned_response = '\n'.join(line for line in cleaned_lines if line.strip())
-    
-    # Get the most recently extracted memories
-    if hasattr(chatbot.agent, 'memories') and chatbot.agent.memories:
-        recent_memories = sorted(chatbot.agent.memories, key=lambda m: m.created_at, reverse=True)[:5]
+    # 获取最近提取的记忆
+    if hasattr(assistant.agent, 'memories') and assistant.agent.memories:
+        recent_memories = sorted(assistant.agent.memories, key=lambda m: m.created_at, reverse=True)[:5]
         recent_memory_texts = [f"- {memory.content}" for memory in recent_memories]
         memories_history.append("\n".join(recent_memory_texts))
     else:
-        memories_history.append("No memories extracted")
+        memories_history.append("未提取记忆")
     
-    return cleaned_response
+    return response
 
 def process_message(message, history):
-    """Process a user message and update the chat history"""
-    global chatbot, database_loaded, current_user
+    """
+    处理用户消息并更新聊天历史
+    
+    Args:
+        message: 用户消息
+        history: 聊天历史
+        
+    Returns:
+        更新后的聊天历史
+    """
+    global assistant, database_loaded, current_user
     
     if not current_user:
-        return [{"role": "assistant", "content": "Please log in first."}]
+        return [{"role": "assistant", "content": "请先登录。"}]
         
     if not database_loaded:
-        return [{"role": "assistant", "content": "Please load a database first using the 'Load Database' button."}]
+        return [{"role": "assistant", "content": "请先使用'加载数据库'按钮加载数据库。"}]
     
-    # Run the async function in a new event loop
+    # 在新事件循环中运行异步函数
     response = asyncio.run(process_message_async(message))
     
-    # Format the response as list of message dictionaries
+    # 将响应格式化为消息字典列表
     history = history or []
     history.append({"role": "user", "content": message})
     history.append({"role": "assistant", "content": response})
@@ -144,25 +224,30 @@ def process_message(message, history):
     return history
 
 def get_categorized_memories():
-    """Get categorized memories from the database"""
-    global chatbot
-    if not chatbot or not hasattr(chatbot, 'agent'):
-        return "No memories available"
+    """
+    从数据库获取分类的记忆
     
-    # Get all memories
-    memories = chatbot.agent.memories
+    Returns:
+        分类记忆的格式化字符串
+    """
+    global assistant
+    if not assistant or not hasattr(assistant, 'agent'):
+        return "无可用记忆"
+    
+    # 获取所有记忆
+    memories = assistant.agent.memories
     if not memories:
-        return "No memories available"
+        return "无可用记忆"
     
-    # Categorize memories
+    # 分类记忆
     categories = {
-        'PREFERENCE': [],
-        'TERM': [],
-        'METRIC': [],
-        'ENTITY': []
+        'PREFERENCE': [],  # 偏好
+        'TERM': [],        # 术语
+        'METRIC': [],      # 指标
+        'ENTITY': []       # 实体
     }
     
-    # Sort memories by creation time, newest first
+    # 按创建时间排序记忆，最新的在前
     sorted_memories = sorted(memories, key=lambda m: m.created_at, reverse=True)
     
     for memory in sorted_memories:
@@ -176,187 +261,294 @@ def get_categorized_memories():
         elif '[ENTITY]' in content:
             categories['ENTITY'].append(content.replace('[ENTITY]', '').strip())
     
-    # Format output with latest 5 entries per category
+    # 格式化输出，每个类别显示最新的5个条目
     output = []
     for category, items in categories.items():
         if items:
             output.append(f"\n{category}:")
-            for item in items[:5]:  # Show only latest 5 memories per category
+            for item in items[:5]:  # 每个类别只显示最新的5个记忆
                 output.append(f"- {item}")
     
-    return '\n'.join(output) if output else "No categorized memories available"
+    return '\n'.join(output) if output else "无分类记忆可用"
 
 def get_current_memories():
-    """Get the current memories from the chatbot"""
+    """
+    从智能助手获取当前记忆
+    
+    Returns:
+        当前记忆的格式化字符串
+    """
     global memories_history
     
-    # Get persistent memories from database
+    # 从数据库获取持久记忆
     persistent_memories = get_categorized_memories()
     
-    # Get current session memories
-    current_session = memories_history[-1] if memories_history else "No recent memories in current session"
+    # 获取当前会话记忆
+    current_session = memories_history[-1] if memories_history else "当前会话中无最近记忆"
     
-    # Combine both with headers
-    return f"""PERSISTENT MEMORIES:\n{persistent_memories}\n\nCURRENT SESSION MEMORIES:\n{current_session}"""
+    # 组合两者并添加标题
+    return f"""持久记忆:\n{persistent_memories}\n\n当前会话记忆:\n{current_session}"""
 
 def logout():
-    """Log out the current user"""
-    global chatbot, current_user, database_loaded, chat_history, memories_history
+    """
+    用户登出功能
     
-    chatbot = None
+    Returns:
+        登出状态消息
+    """
+    global assistant, current_user, database_loaded, chat_history, memories_history
+    
+    # 重置所有全局变量
+    assistant = None
     current_user = None
     database_loaded = False
     chat_history = []
     memories_history = []
     
-    return "You have been logged out. Please log in to continue."
+    return "✅ 已成功登出。"
 
 def build_interface():
-    """Build the Gradio interface"""
-    with gr.Blocks(css="footer {visibility: hidden}") as interface:
-        gr.Markdown("# Smart Query Assistant - Your text to Sql Expert")
-        gr.Markdown("This chatbot demonstrates long-term memory capabilities using the Mem0 architecture with Denodo AI SDK.")
-        
-        # Login section
-        with gr.Group():
-            gr.Markdown("### Login to Denodo")
-            with gr.Row():
-                username_input = gr.Textbox(
-                    placeholder="Enter your Denodo username",
-                    label="Username",
-                    value="admin"
-                )
-                password_input = gr.Textbox(
-                    placeholder="Enter your Denodo password",
-                    label="Password",
-                    value="admin",
-                    type="password"
-                )
-                login_button = gr.Button("Login", variant="primary")
-            login_status = gr.Textbox(label="Login Status", interactive=False)
-            logout_button = gr.Button("Logout")
+    """
+    构建Gradio用户界面
+    
+    Returns:
+        配置好的Gradio界面
+    """
+    # 创建界面标题和描述
+    title = "智能查询助手：具有长期记忆的Text2SQL代理（无Denodo版本）"
+    description = """
+    这个智能助手能够记住您的偏好和术语，提供个性化的数据库查询体验。
+    支持多种数据库类型：PostgreSQL、MySQL、SQLite等。
+    
+    **使用步骤：**
+    1. 配置数据库连接参数
+    2. 使用用户名登录
+    3. 加载数据库
+    4. 开始用自然语言询问数据
+    5. 查看系统记住的关于您的偏好
+    
+    **功能特点：**
+    - 跨会话记住用户偏好
+    - 学习自定义术语和定义
+    - 基于向量的相似性搜索
+    - 用户隔离的记忆存储
+    - 支持多种数据库类型
+    """
+    
+    # 创建界面组件
+    with gr.Blocks(title=title, theme=gr.themes.Soft()) as interface:
+        gr.Markdown(f"# {title}")
+        gr.Markdown(description)
         
         with gr.Row():
-            with gr.Column(scale=3):
-                # Database loading section
-                with gr.Group():
-                    gr.Markdown("### Load a Database")
-                    with gr.Row():
-                        db_name_input = gr.Textbox(
-                            placeholder="Enter database name (e.g., bank)", 
-                            label="Database Name",
-                            value="bank"
-                        )
-                        load_button = gr.Button("Load Database", variant="primary")
-                    db_status = gr.Textbox(label="Database Status", interactive=False)
+            with gr.Column(scale=1):
+                # 数据库配置部分
+                gr.Markdown("## 🔧 数据库配置")
+                db_type_dropdown = gr.Dropdown(
+                    choices=["sqlite", "postgresql", "mysql"],
+                    value=DB_TYPE,
+                    label="数据库类型",
+                    interactive=True
+                )
                 
-                # Chat interface
-                chatbot_interface = gr.Chatbot(
-                    label="Conversation",
-                    height=500,
-                    bubble_full_width=False,
-                    type="messages"  # Add type parameter
+                # SQLite配置
+                with gr.Group(visible=DB_TYPE=="sqlite") as sqlite_config:
+                    sqlite_path = gr.Textbox(
+                        label="数据库文件路径",
+                        value=DB_CONFIG["sqlite"]["database_path"],
+                        placeholder="database.db"
+                    )
+                
+                # PostgreSQL配置
+                with gr.Group(visible=DB_TYPE=="postgresql") as postgres_config:
+                    pg_conn_string = gr.Textbox(
+                        label="连接字符串",
+                        value=DB_CONFIG["postgresql"]["connection_string"],
+                        placeholder="postgresql://user:pass@localhost:5432/dbname"
+                    )
+                
+                # MySQL配置
+                with gr.Group(visible=DB_TYPE=="mysql") as mysql_config:
+                    mysql_host = gr.Textbox(
+                        label="主机地址",
+                        value=DB_CONFIG["mysql"]["host"],
+                        placeholder="localhost"
+                    )
+                    mysql_port = gr.Number(
+                        label="端口",
+                        value=DB_CONFIG["mysql"]["port"],
+                        placeholder="3306"
+                    )
+                    mysql_database = gr.Textbox(
+                        label="数据库名",
+                        value=DB_CONFIG["mysql"]["database"],
+                        placeholder="database_name"
+                    )
+                    mysql_username = gr.Textbox(
+                        label="用户名",
+                        value=DB_CONFIG["mysql"]["username"],
+                        placeholder="username"
+                    )
+                    mysql_password = gr.Textbox(
+                        label="密码",
+                        value=DB_CONFIG["mysql"]["password"],
+                        type="password",
+                        placeholder="password"
+                    )
+                
+                test_connection_button = gr.Button("测试连接", variant="secondary")
+                connection_status = gr.Textbox(label="连接状态", interactive=False)
+                
+                # 登录部分
+                gr.Markdown("## 🔐 登录")
+                username_input = gr.Textbox(
+                    label="用户名",
+                    placeholder="输入您的用户名",
+                    type="text"
                 )
-                msg_input = gr.Textbox(
-                    placeholder="Ask a question about the data...",
-                    label="Your Question",
-                    scale=4
-                )
-                with gr.Row():
-                    submit_button = gr.Button("Submit", variant="primary", scale=1)
-                    clear_button = gr.Button("Clear Chat", scale=1)
-            
-            # Memory display section
-            with gr.Column(scale=2):
-                gr.Markdown("### Memory System")
-                gr.Markdown("Showing both persistent memories from database and current session memories:")
-                memory_display = gr.Textbox(
-                    label="Active Memories",
+                login_button = gr.Button("登录", variant="primary")
+                login_status = gr.Textbox(label="登录状态", interactive=False)
+                
+                # 数据库加载部分
+                gr.Markdown("## 🗄️ 数据库")
+                load_db_button = gr.Button("加载数据库", variant="secondary")
+                db_status = gr.Textbox(label="数据库状态", interactive=False)
+                
+                # 记忆查看部分
+                gr.Markdown("## 🧠 记忆管理")
+                view_memories_button = gr.Button("查看记忆", variant="secondary")
+                memories_display = gr.Textbox(
+                    label="您的记忆",
                     interactive=False,
-                    lines=20  # Increased to show more memories
+                    lines=10,
+                    max_lines=15
                 )
-                refresh_memory_btn = gr.Button("Refresh Memories")
+                
+                # 登出部分
+                gr.Markdown("## 🚪 登出")
+                logout_button = gr.Button("登出", variant="stop")
+                logout_status = gr.Textbox(label="登出状态", interactive=False)
+            
+            with gr.Column(scale=2):
+                # 聊天界面
+                gr.Markdown("## 💬 智能查询")
+                chat_interface = gr.Chatbot(
+                    label="对话历史",
+                    height=500,
+                    show_label=True
+                )
+                message_input = gr.Textbox(
+                    label="输入您的问题",
+                    placeholder="例如：显示利率最高的贷款",
+                    lines=2
+                )
+                send_button = gr.Button("发送", variant="primary")
+                clear_button = gr.Button("清除对话", variant="secondary")
         
-        # Set up event handlers
+        # 设置事件处理
+        def update_config_visibility(db_type):
+            """更新配置组件的可见性"""
+            return (
+                gr.Group(visible=db_type=="sqlite"),
+                gr.Group(visible=db_type=="postgresql"),
+                gr.Group(visible=db_type=="mysql")
+            )
+        
+        db_type_dropdown.change(
+            fn=update_config_visibility,
+            inputs=[db_type_dropdown],
+            outputs=[sqlite_config, postgres_config, mysql_config]
+        )
+        
+        def test_db_connection(db_type, sqlite_path, pg_conn_string, 
+                             mysql_host, mysql_port, mysql_database, 
+                             mysql_username, mysql_password):
+            """测试数据库连接"""
+            if db_type == "sqlite":
+                return test_database_connection(db_type, database_path=sqlite_path)
+            elif db_type == "postgresql":
+                return test_database_connection(db_type, connection_string=pg_conn_string)
+            elif db_type == "mysql":
+                return test_database_connection(db_type, 
+                                              host=mysql_host,
+                                              port=int(mysql_port),
+                                              database=mysql_database,
+                                              username=mysql_username,
+                                              password=mysql_password)
+            return "请选择数据库类型"
+        
+        test_connection_button.click(
+            fn=test_db_connection,
+            inputs=[db_type_dropdown, sqlite_path, pg_conn_string,
+                   mysql_host, mysql_port, mysql_database, mysql_username, mysql_password],
+            outputs=[connection_status]
+        )
+        
         login_button.click(
             fn=login,
-            inputs=[username_input, password_input],
+            inputs=[username_input],
             outputs=[login_status]
+        )
+        
+        load_db_button.click(
+            fn=load_database,
+            inputs=[],
+            outputs=[db_status]
+        )
+        
+        view_memories_button.click(
+            fn=get_current_memories,
+            inputs=[],
+            outputs=[memories_display]
         )
         
         logout_button.click(
             fn=logout,
             inputs=[],
-            outputs=[login_status]
+            outputs=[logout_status]
         )
         
-        load_button.click(
-            fn=load_database,
-            inputs=[db_name_input],
-            outputs=[db_status]
-        )
-        
-        submit_button.click(
+        # 聊天功能
+        send_button.click(
             fn=process_message,
-            inputs=[msg_input, chatbot_interface],
-            outputs=[chatbot_interface],
-            trigger_mode="once"  # Changed from single to once
-        ).success(
+            inputs=[message_input, chat_interface],
+            outputs=[chat_interface]
+        ).then(
             fn=lambda: "",
-            outputs=[msg_input]
-        ).success(
-            fn=get_current_memories,
-            outputs=[memory_display]
+            inputs=[],
+            outputs=[message_input]
         )
         
-        msg_input.submit(
+        # 回车键发送消息
+        message_input.submit(
             fn=process_message,
-            inputs=[msg_input, chatbot_interface],
-            outputs=[chatbot_interface],
-            trigger_mode="once"  # Changed from single to once
+            inputs=[message_input, chat_interface],
+            outputs=[chat_interface]
+        ).then(
+            fn=lambda: "",
+            inputs=[],
+            outputs=[message_input]
         )
         
+        # 清除对话
         clear_button.click(
             fn=lambda: [],
-            outputs=[chatbot_interface]
+            inputs=[],
+            outputs=[chat_interface]
         )
-        
-        refresh_memory_btn.click(
-            fn=get_current_memories,
-            outputs=[memory_display]
-        )
-        
-        # Add examples
-        with gr.Accordion("Example Questions", open=False):
-            gr.Markdown("""
-            ### Example Questions to Try:
-            
-            **Basic Queries:**
-            - How many approved loans do we have?
-            - What is the average interest rate for those?
-            - Show me all customers who live in California.
-            
-            **Follow-up Patterns:**
-            - Show me properties in California.
-            - Which ones are valued over $400,000?
-            - And which of those have loans associated with them?
-            
-            **Terminology Learning:**
-            - I'll refer to West Coast states as WCS, meaning CA, OR, and WA.
-            - How many properties do we have in WCS?
-            
-            **Preference Learning:**
-            - I'm only interested in loans with interest rates below 4%.
-            - Show me new loans created in the last year.
-            
-            **Custom Metrics:**
-            - Let's define high-value properties as those worth over $500,000.
-            - How many high-value properties do we have?
-            """)
     
     return interface
 
-# Build and launch the interface
+# 启动应用程序
 if __name__ == "__main__":
+    print("启动智能查询助手前端界面（无Denodo版本）...")
+    print(f"数据库类型: {DB_TYPE}")
+    print(f"使用PostgreSQL记忆存储: {USE_POSTGRES}")
+    
     interface = build_interface()
-    interface.launch(server_name="0.0.0.0", share=True)
+    interface.launch(
+        server_name="0.0.0.0",  # 允许外部访问
+        server_port=7860,       # 默认端口
+        share=False,            # 不创建公共链接
+        debug=True              # 启用调试模式
+    ) 

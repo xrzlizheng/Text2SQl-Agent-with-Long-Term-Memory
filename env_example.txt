@@ -1,0 +1,63 @@
+# 智能查询助手环境变量配置示例
+# ============================================
+# 请复制此文件为 .env 并填入您的实际配置
+
+# 火山引擎AI配置
+# --------------
+# 您的火山引擎AI API密钥（必需）
+AI_API_KEY=your_volcengine_api_key_here
+
+# 火山引擎AI服务基础URL
+AI_BASE_URL=https://api.volcengine.com/v1
+
+# 使用的AI模型
+AI_MODEL=doubao-seed-1-6-250615
+
+# 思维链模式（可选，true/false）
+THINKING=true
+
+# 嵌入模型（使用本地Qwen嵌入模型）
+EMBEDDING_MODEL=Qwen/Qwen3-Embedding-8B
+
+# 数据库配置（可选）
+# ------------------
+# 数据库类型
+DB_TYPE=sqlite
+
+# PostgreSQL配置（可选，用于生产环境）
+PG_CONN_STRING=postgresql://user:password@localhost:5432/memorydb
+
+# MySQL配置（可选）
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_DATABASE=your_database
+MYSQL_USERNAME=your_username
+MYSQL_PASSWORD=your_password
+
+# SQLite配置（开发环境默认）
+SQLITE_PATH=database.db
+
+# 开发环境配置（可选）
+# -------------------
+# 调试模式
+DEBUG=true
+
+# 日志级别
+LOG_LEVEL=INFO
+
+# 服务器配置（可选）
+# -----------------
+# 前端服务器端口
+FRONTEND_PORT=7860
+
+# 是否允许外部访问
+ALLOW_EXTERNAL_ACCESS=false
+
+# 安全注意事项：
+# 1. 此文件仅作为示例，请复制为 .env 文件并填入实际值
+# 2. .env 文件已被添加到 .gitignore 中，不会被提交到版本控制
+# 3. 生产环境中请使用强密码和安全的API密钥
+# 4. 如果使用PostgreSQL，请确保已安装pgvector扩展
+# 5. 建议定期更新API密钥和密码
+# 6. 火山引擎API密钥请从火山引擎控制台获取
+# 7. 请确保不要将包含真实API密钥的文件提交到Git仓库 
